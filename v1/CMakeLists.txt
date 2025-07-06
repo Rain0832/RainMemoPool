@@ -23,6 +23,3 @@ target_compile_options(${PROJECT_NAME} PRIVATE -g -pthread)
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} pthread)
-
-# Link libraries (if any)
-# target_link_libraries(${PROJECT_NAME} <library_name>)
