@@ -2,15 +2,20 @@
 
 namespace RainMemoPool
 {
-    MemoryPool::MemoryPool(size_t BlockSize)
-        : BlockSize_(BlockSize), SlotSize_(0), firstBlock_(nullptr), curSlot_(nullptr), freeList_(nullptr), lastSlot_(nullptr)
+    MemoryPool::MemoryPool(size_t block_size)
+        : block_size(block_size),
+          slot_size(0),
+          first_block(nullptr),
+          cur_slot(nullptr),
+          free_list(nullptr),
+          last_slot(nullptr)
     {
     }
 
     MemoryPool::~MemoryPool()
     {
         // 把连续的block删除
-        Slot *cur = firstBlock_;
+        Slot *cur = first_block;
         while (cur)
         {
             Slot *next = cur->next;
@@ -24,11 +29,11 @@ namespace RainMemoPool
     void MemoryPool::init(size_t size)
     {
         assert(size > 0);
-        SlotSize_ = size;
-        firstBlock_ = nullptr;
-        curSlot_ = nullptr;
-        freeList_ = nullptr;
-        lastSlot_ = nullptr;
+        slot_size = size;
+        first_block = nullptr;
+        cur_slot = nullptr;
+        free_list = nullptr;
+        last_slot = nullptr;
     }
 
     void *MemoryPool::allocate()
@@ -40,16 +45,16 @@ namespace RainMemoPool
 
         Slot *temp;
         {
-            std::lock_guard<std::mutex> lock(mutexForBlock_);
-            if (curSlot_ >= lastSlot_)
+            std::lock_guard<std::mutex> lock(mutex_for_block);
+            if (cur_slot >= last_slot)
             {
                 // 当前内存块已无内存槽可用，开辟一块新的内存
                 allocateNewBlock();
             }
 
-            temp = curSlot_;
+            temp = cur_slot;
             // 这里不能直接 curSlot_ += SlotSize_ 因为curSlot_是Slot*类型，所以需要除以SlotSize_再加1
-            curSlot_ += SlotSize_ / sizeof(Slot);
+            cur_slot += slot_size / sizeof(Slot);
         }
 
         return temp;
@@ -68,16 +73,16 @@ namespace RainMemoPool
     {
         // std::cout << "申请一块内存块，SlotSize: " << SlotSize_ << std::endl;
         //  头插法插入新的内存块
-        void *newBlock = operator new(BlockSize_);
-        reinterpret_cast<Slot *>(newBlock)->next = firstBlock_;
-        firstBlock_ = reinterpret_cast<Slot *>(newBlock);
+        void *new_block = operator new(block_size);
+        reinterpret_cast<Slot *>(new_block)->next = first_block;
+        first_block = reinterpret_cast<Slot *>(new_block);
 
-        char *body = reinterpret_cast<char *>(newBlock) + sizeof(Slot *);
-        size_t paddingSize = padPointer(body, SlotSize_); // 计算对齐需要填充内存的大小
-        curSlot_ = reinterpret_cast<Slot *>(body + paddingSize);
+        char *body = reinterpret_cast<char *>(new_block) + sizeof(Slot *);
+        size_t padding_size = padPointer(body, slot_size); // 计算对齐需要填充内存的大小
+        cur_slot = reinterpret_cast<Slot *>(body + padding_size);
 
         // 超过该标记位置，则说明该内存块已无内存槽可用，需向系统申请新的内存块
-        lastSlot_ = reinterpret_cast<Slot *>(reinterpret_cast<size_t>(newBlock) + BlockSize_ - SlotSize_ + 1);
+        last_slot = reinterpret_cast<Slot *>(reinterpret_cast<size_t>(new_block) + block_size - slot_size + 1);
     }
 
     // 让指针对齐到槽大小的倍数位置
@@ -93,17 +98,20 @@ namespace RainMemoPool
         while (true)
         {
             // 获取当前头节点
-            Slot *oldHead = freeList_.load(std::memory_order_relaxed);
+            Slot *old_head = free_list.load(std::memory_order_relaxed);
             // 将新节点的 next 指向当前头节点
-            slot->next.store(oldHead, std::memory_order_relaxed);
+            slot->next.store(old_head, std::memory_order_relaxed);
 
             // 尝试将新节点设置为头节点
-            if (freeList_.compare_exchange_weak(oldHead, slot,
-                                                std::memory_order_release, std::memory_order_relaxed))
+            if (free_list.compare_exchange_weak(
+                    old_head,
+                    slot,
+                    std::memory_order_release,
+                    std::memory_order_relaxed))
             {
                 return true;
             }
-            // 失败：说明另一个线程可能已经修改了 freeList_
+            // 失败：说明另一个线程可能已经修改了 free_list
             // CAS 失败则重试
         }
     }
@@ -113,15 +121,15 @@ namespace RainMemoPool
     {
         while (true)
         {
-            Slot *oldHead = freeList_.load(std::memory_order_acquire);
-            if (oldHead == nullptr)
+            Slot *old_head = free_list.load(std::memory_order_acquire);
+            if (old_head == nullptr)
                 return nullptr; // 队列为空
 
-            // 在访问 newHead 之前再次验证 oldHead 的有效性
-            Slot *newHead = nullptr;
+            // 在访问 new_head 之前再次验证 old_head 的有效性
+            Slot *new_head = nullptr;
             try
             {
-                newHead = oldHead->next.load(std::memory_order_relaxed);
+                new_head = old_head->next.load(std::memory_order_relaxed);
             }
             catch (...)
             {
@@ -130,13 +138,13 @@ namespace RainMemoPool
             }
 
             // 尝试更新头结点
-            // 原子性地尝试将 freeList_ 从 oldHead 更新为 newHead
-            if (freeList_.compare_exchange_weak(oldHead, newHead,
+            // 原子性地尝试将 free_list 从 old_head 更新为 new_head
+            if (free_list.compare_exchange_weak(old_head, new_head,
                                                 std::memory_order_acquire, std::memory_order_relaxed))
             {
-                return oldHead;
+                return old_head;
             }
-            // 失败：说明另一个线程可能已经修改了 freeList_
+            // 失败：说明另一个线程可能已经修改了 free_list
             // CAS 失败则重试
         }
     }
@@ -152,8 +160,8 @@ namespace RainMemoPool
     // 单例模式
     MemoryPool &HashBucket::getMemoryPool(int index)
     {
-        static MemoryPool memoryPool[MEMORY_POOL_NUM];
-        return memoryPool[index];
+        static MemoryPool memory_pool[MEMORY_POOL_NUM];
+        return memory_pool[index];
     }
 
 } // namespace memoryPool
