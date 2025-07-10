@@ -4,27 +4,36 @@
 
 #include "MemoryPool.h"
 
+#define TIMES 100
+#define WORKS 10
+#define ROUNDS 10
+
+#define SMALL_LEVEL 1
+#define MID_LEVEL 5
+#define BIG_LEVEL 10
+#define LARGE_LEVEL 20
+
 using namespace RainMemoPool;
 
-// 测试用例
-class P1
+// 测试用例类，不同大小的对象
+class TestSmallLevel
 {
-	int id_;
+	int id[SMALL_LEVEL];
 };
 
-class P2
+class TestMidLevel
 {
-	int id_[5];
+	int id[MID_LEVEL];
 };
 
-class P3
+class TestBigLevel
 {
-	int id_[10];
+	int id[BIG_LEVEL];
 };
 
-class P4
+class TestLargeLevel
 {
-	int id_[20];
+	int id[LARGE_LEVEL];
 };
 
 // 单轮次申请释放次数 线程数 轮次
@@ -41,14 +50,14 @@ void BenchmarkMemoryPool(size_t ntimes, size_t nworks, size_t rounds)
 				size_t begin1 = clock();
 				for (size_t i = 0; i < ntimes; i++)
 				{
-                    P1* p1 = newElement<P1>(); // 内存池对外接口
-                    deleteElement<P1>(p1);
-                    P2* p2 = newElement<P2>();
-                    deleteElement<P2>(p2);
-                    P3* p3 = newElement<P3>();
-                    deleteElement<P3>(p3);
-                    P4* p4 = newElement<P4>();
-                    deleteElement<P4>(p4);
+                    TestSmallLevel* p1 = newElement<TestSmallLevel>(); // 内存池对外接口
+                    deleteElement<TestSmallLevel>(p1);
+                    TestMidLevel* p2 = newElement<TestMidLevel>();
+                    deleteElement<TestMidLevel>(p2);
+                    TestBigLevel* p3 = newElement<TestBigLevel>();
+                    deleteElement<TestBigLevel>(p3);
+                    TestLargeLevel* p4 = newElement<TestLargeLevel>();
+                    deleteElement<TestLargeLevel>(p4);
 				}
 				size_t end1 = clock();
 
@@ -59,7 +68,9 @@ void BenchmarkMemoryPool(size_t ntimes, size_t nworks, size_t rounds)
 	{
 		t.join();
 	}
-	printf("%lu个线程并发执行%lu轮次，每轮次newElement&deleteElement %lu次，总计花费：%lu ms\n", nworks, rounds, ntimes, total_costtime);
+	std::cout << nworks << " 个线程并发执行 " << rounds << " 轮次" << std::endl;
+	std::cout << "每轮次 newElement & deleteElement " << ntimes << " 次" << std::endl;
+	std::cout << "总计花费：" << total_costtime << " ms" << std::endl;
 }
 
 void BenchmarkNew(size_t ntimes, size_t nworks, size_t rounds)
@@ -75,13 +86,13 @@ void BenchmarkNew(size_t ntimes, size_t nworks, size_t rounds)
 				size_t begin1 = clock();
 				for (size_t i = 0; i < ntimes; i++)
 				{
-                    P1* p1 = new P1;
+                    TestSmallLevel* p1 = new TestSmallLevel;
                     delete p1;
-                    P2* p2 = new P2;
+                    TestMidLevel* p2 = new TestMidLevel;
                     delete p2;
-                    P3* p3 = new P3;
+                    TestBigLevel* p3 = new TestBigLevel;
                     delete p3;
-                    P4* p4 = new P4;
+                    TestLargeLevel* p4 = new TestLargeLevel;
                     delete p4;
 				}
 				size_t end1 = clock();
@@ -93,16 +104,18 @@ void BenchmarkNew(size_t ntimes, size_t nworks, size_t rounds)
 	{
 		t.join();
 	}
-	printf("%lu个线程并发执行%lu轮次，每轮次malloc&free %lu次，总计花费：%lu ms\n", nworks, rounds, ntimes, total_costtime);
+	std::cout << nworks << " 个线程并发执行 " << rounds << " 轮次" << std::endl;
+	std::cout << "每轮次 malloc & free " << ntimes << " 次" << std::endl;
+	std::cout << "总计花费：" << total_costtime << " ms" << std::endl;
 }
 
 int main()
 {
-	HashBucket::initMemoryPool();		 // 使用内存池接口前一定要先调用该函数
-	BenchmarkMemoryPool(100, 1, 10); // 测试内存池
+	HashBucket::initMemoryPool(); // 使用内存池接口前一定要先调用该函数
 	std::cout << "===========================================================================" << std::endl;
+	BenchmarkMemoryPool(TIMES, WORKS, ROUNDS); // 测试内存池
 	std::cout << "===========================================================================" << std::endl;
-	BenchmarkNew(100, 1, 10); // 测试 new delete
+	BenchmarkNew(TIMES, WORKS, ROUNDS); // 测试 new delete
 
 	return 0;
 }
