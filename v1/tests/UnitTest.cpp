@@ -5,7 +5,7 @@
 #include "MemoryPool.h"
 
 #define TIMES 100
-#define WORKS 10
+#define WORKS 1
 #define ROUNDS 10
 
 #define SMALL_LEVEL 1
