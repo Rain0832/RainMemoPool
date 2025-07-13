@@ -7,59 +7,27 @@
 #include <memory>
 #include <mutex>
 
+namespace RainMemoPool
+{
 #define MEMORY_POOL_NUM 64
 #define SLOT_BASE_SIZE 8
 #define MAX_SLOT_SIZE 512
 
-namespace RainMemoPool
-{
-  /*
-  具体内存池的槽大小没法确定，因为每个内存池的槽大小不同( 8 的倍数)
-  所以这个槽结构体的 sizeof 不是实际的槽大小
-  */
-  struct SlotLock
-  {
-    Slot *next;
-  };
-
+  /* 具体内存池的槽大小没法确定，因为每个内存池的槽大小不同(8的倍数)
+     所以这个槽结构体的sizeof 不是实际的槽大小 */
   struct Slot
   {
     std::atomic<Slot *> next; // 原子指针
   };
 
-  class MemoryPoolLock
-  {
-  public:
-    MemoryPoolLock(size_t block_size = 4096);
-    ~MemoryPoolLock();
-
-    void init(size_t);
-
-    void *allocate();
-    void deallocate(void *);
-
-  private:
-    void allocateNewBlock();
-    size_t padPointer(char *p, size_t align);
-
-  private:
-    int block_size;                 // 内存块大小
-    int slot_size_;                 // 槽大小
-    Slot *first_block;              // 指向内存池管理的首个实际内存块
-    Slot *cur_slot;                 // 指向当前未被使用过的槽
-    Slot *free_list;                // 指向空闲的槽(被使用过后又被释放的槽)
-    Slot *last_slot;                // 作为当前内存块中最后能够存放元素的位置标识(超过该位置需申请新的内存块)
-    std::mutex mutex_for_free_list; // 保证 free_list 在多线程中操作的原子性
-    std::mutex mutex_for_block;     // 保证多线程情况下避免不必要的重复开辟内存导致的浪费行为
-  };
-
   class MemoryPool
   {
   public:
-    MemoryPool(size_t block_size = 4096);
+    MemoryPool(size_t BlockSize = 4096);
     ~MemoryPool();
 
     void init(size_t);
+
     void *allocate();
     void deallocate(void *);
 
@@ -67,7 +35,7 @@ namespace RainMemoPool
     void allocateNewBlock();
     size_t padPointer(char *p, size_t align);
 
-    // 使用 CAS 操作进行无锁入队和出队
+    // 使用CAS操作进行无锁入队和出队
     bool pushFreeList(Slot *slot);
     Slot *popFreeList();
 
@@ -78,7 +46,8 @@ namespace RainMemoPool
     Slot *cur_slot;                // 指向当前未被使用过的槽
     std::atomic<Slot *> free_list; // 指向空闲的槽(被使用过后又被释放的槽)
     Slot *last_slot;               // 作为当前内存块中最后能够存放元素的位置标识(超过该位置需申请新的内存块)
-    std::mutex mutex_for_block;    // 保证多线程情况下避免不必要的重复开辟内存导致的浪费行为
+    // std::mutex          mutexForFreeList_; // 保证freeList_在多线程中操作的原子性
+    std::mutex mutex_for_block; // 保证多线程情况下避免不必要的重复开辟内存导致的浪费行为
   };
 
   class HashBucket
@@ -91,9 +60,7 @@ namespace RainMemoPool
     {
       if (size <= 0)
         return nullptr;
-
-      // 大于512字节的内存，则使用new
-      if (size > MAX_SLOT_SIZE)
+      if (size > MAX_SLOT_SIZE) // 大于512字节的内存，则使用new
         return operator new(size);
 
       // 相当于size / 8 向上取整（因为分配内存只能大不能小
@@ -144,4 +111,4 @@ namespace RainMemoPool
     }
   }
 
-} // namespace RainMemoPool
+} // namespace memoryPool

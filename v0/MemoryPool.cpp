@@ -2,92 +2,6 @@
 
 namespace RainMemoPool
 {
-    MemoryPoolLock::MemoryPoolLock(size_t block_size)
-        : block_size(block_size)
-    {
-    }
-
-    MemoryPoolLock::~MemoryPoolLock()
-    {
-        SlotLock *cur = first_block;
-        while (cur)
-        {
-            SlotLock *next = cur->next;
-            // 等同于 free(reinterpret_cast<void*>(first_block);
-            // 转化为 void 指针，因为 void 类型不需要调用析构函数，只释放空间
-            operator delete(reinterpret_cast<void *>(cur));
-            cur = next;
-        }
-    }
-
-    void MemoryPoolLock::init(size_t size)
-    {
-        assert(size > 0);
-        slot_size_ = size;
-        first_block = nullptr;
-        cur_slot = nullptr;
-        free_list = nullptr;
-        last_slot = nullptr;
-    }
-
-    void *MemoryPoolLock::allocate()
-    {
-        // 优先使用空闲链表中的内存槽
-        if (free_list != nullptr)
-        {
-            std::lock_guard<std::mutex> lock(mutex_for_free_list);
-            if (free_list != nullptr)
-            {
-                SlotLock *temp = free_list;
-                free_list = free_list->next;
-                return temp;
-            }
-        }
-        SlotLock *temp;
-        std::lock_guard<std::mutex> lock(mutex_for_block);
-        if (cur_slot >= last_slot)
-        {
-            // 当前内存块已无内存槽可用，开辟一块新的内存
-            allocateNewBlock();
-        }
-        temp = cur_slot;
-        cur_slot += slot_size / sizeof(SlotLock);
-
-        return temp;
-    }
-
-    void MemoryPoolLock::deallocate(void *ptr)
-    {
-        if (!ptr)
-            return;
-
-        std::lock_guard<std::mutex> lock(mutex_for_free_list);
-        reinterpret_cast<SlotLock *>(ptr)->next = free_list;
-        free_list = reinterpret_cast<SlotLock *>(ptr);
-    }
-
-    void MemoryPoolLock::allocateNewBlock()
-    {
-        // std::cout << "申请一块内存块，SlotSize: " << SlotSize_ << std::endl;
-        // 头插法插入新的内存块
-        void *new_block = operator new(block_size);
-        reinterpret_cast<SlotLock *>(new_block)->next = first_block;
-        first_block = reinterpret_cast<SlotLock *>(new_block);
-
-        char *body = reinterpret_cast<char *>(new_block) + sizeof(SlotLock *);
-        size_t padding_size = padPointer(body, slot_size_); // 计算对齐需要填充内存的大小
-        cur_slot = reinterpret_cast<SlotLock *>(body + padding_size);
-
-        // 超过该标记位置，则说明该内存块已无内存槽可用，需向系统申请新的内存块
-        last_slot = reinterpret_cast<SlotLock *>(reinterpret_cast<size_t>(new_block) + block_size - slot_size_ + 1);
-    }
-
-    size_t MemoryPoolLock::padPointer(char *p, size_t align)
-    {
-        // align 是槽大小
-        return align - (reinterpret_cast<size_t>(p) % align);
-    }
-
     MemoryPool::MemoryPool(size_t block_size)
         : block_size(block_size),
           slot_size(0),
@@ -226,8 +140,7 @@ namespace RainMemoPool
             // 尝试更新头结点
             // 原子性地尝试将 free_list 从 old_head 更新为 new_head
             if (free_list.compare_exchange_weak(old_head, new_head,
-                                                std::memory_order_acquire,
-                                                std::memory_order_relaxed))
+                                                std::memory_order_acquire, std::memory_order_relaxed))
             {
                 return old_head;
             }
