@@ -22,6 +22,10 @@ namespace RainMemory
       strategy_ = strategy;
       for (int i = 0; i < MEMORY_POOL_NUM; ++i)
       {
+        if (strategy_ == Strategy::Lock)
+          pools_[i] = std::make_unique<MemoryPoolLock>();
+        else
+          pools_[i] = std::make_unique<MemoryPoolAtomic>();
         pools_[i]->init((i + 1) * SLOT_BASE_SIZE);
       }
     }
@@ -66,17 +70,7 @@ namespace RainMemory
 
   private:
     static inline Strategy strategy_ = Strategy::Atomic;
-    static inline std::array<std::unique_ptr<MemoryPoolBase>, MEMORY_POOL_NUM> pools_ = []
-    {
-      std::array<std::unique_ptr<MemoryPoolBase>, MEMORY_POOL_NUM> arr;
-      for (int i = 0; i < MEMORY_POOL_NUM; ++i)
-      {
-        arr[i] = strategy_ == Strategy::Lock
-                     ? std::unique_ptr<MemoryPoolBase>(std::make_unique<MemoryPoolLock>())
-                     : std::unique_ptr<MemoryPoolBase>(std::make_unique<MemoryPoolAtomic>());
-      }
-      return arr;
-    }();
+    static inline std::array<std::unique_ptr<MemoryPoolBase>, MEMORY_POOL_NUM> pools_;
   };
 
 } // namespace RainMemory

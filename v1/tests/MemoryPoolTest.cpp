@@ -7,9 +7,9 @@
 
 using namespace RainMemory;
 
-#define TIMES 1000
-#define WORKS 2
-#define ROUNDS 100
+#define TIMES 500
+#define WORKS 5
+#define ROUNDS 50
 
 #define SMALL_LEVEL 1
 #define MID_LEVEL 5
@@ -103,6 +103,7 @@ int main()
 	MemoryAllocator::init(MemoryAllocator::Strategy::Lock);
 	BenchmarkMemoryPool(TIMES, WORKS, ROUNDS);
 
+	sleep(10);
 	std::cout << "\n================ 使用内存池(原子操作) ===================\n";
 	MemoryAllocator::init(MemoryAllocator::Strategy::Atomic);
 	BenchmarkMemoryPool(TIMES, WORKS, ROUNDS);
