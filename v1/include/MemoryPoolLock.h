@@ -4,7 +4,7 @@
 
 namespace RainMemory
 {
-
+  // 继承 Base 抽象类
   class MemoryPoolLock : public MemoryPoolBase
   {
   public:
@@ -23,6 +23,7 @@ namespace RainMemory
     Slot *first_block_ = nullptr;
     Slot *cur_slot_ = nullptr;
     Slot *last_slot_ = nullptr;
+    // 普通链表 + 互斥锁
     Slot *free_list_ = nullptr;
 
     std::mutex mutex_block_;

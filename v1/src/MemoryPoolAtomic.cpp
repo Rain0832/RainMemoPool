@@ -66,6 +66,7 @@ namespace RainMemory
 
   bool MemoryPoolAtomic::pushFreeList(Slot *slot)
   {
+    // 原子操作
     while (true)
     {
       Slot *old_head = free_list_.load(std::memory_order_relaxed);
@@ -81,6 +82,7 @@ namespace RainMemory
 
   Slot *MemoryPoolAtomic::popFreeList()
   {
+    // 原子操作
     while (true)
     {
       Slot *old_head = free_list_.load(std::memory_order_acquire);

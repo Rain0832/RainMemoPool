@@ -27,6 +27,7 @@ namespace RainMemory
     Slot *first_block_ = nullptr;
     Slot *cur_slot_ = nullptr;
     Slot *last_slot_ = nullptr;
+    // 原子链表
     std::atomic<Slot *> free_list_ = {};
 
     std::mutex mutex_block_;

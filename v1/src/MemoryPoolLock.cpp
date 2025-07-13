@@ -22,14 +22,12 @@ namespace RainMemory
 
   void *MemoryPoolLock::allocate()
   {
+    std::lock_guard<std::mutex> lock(mutex_free_);
+    if (free_list_)
     {
-      std::lock_guard<std::mutex> lock(mutex_free_);
-      if (free_list_)
-      {
-        Slot *temp = free_list_;
-        free_list_ = free_list_->next.load();
-        return temp;
-      }
+      Slot *temp = free_list_;
+      free_list_ = free_list_->next.load();
+      return temp;
     }
 
     std::lock_guard<std::mutex> lock(mutex_block_);
